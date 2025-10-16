@@ -1,0 +1,5 @@
+AUTH_SECRET="hqa3h5KdY/CGXtaD6Ic3+UONZVYivyOn5VtMnRVxqJQ=" # Added by `npx auth`. Read more: https://cli.authjs.dev
+EMAIL_SERVER=smtp://bna255396@gmail.com:yphnwqjzzdpumqdn@smtp.gmail.com:587
+EMAIL_FROM=bna255396@gmail.com
+DATABASE_URL=postgresql://Abdel:Abdel@1968@localhost:5432/siti-rh?schema=public
+BLOB_READ_WRITE_TOKEN="vercel_blob_rw_hv7nyXHuHWvgyDUx_dohJY4gK4joO5HMGMQV98S3yByMT0m"
