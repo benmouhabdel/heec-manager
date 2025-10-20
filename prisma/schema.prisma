@@ -2,26 +2,51 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
- 
+
 generator client {
   provider = "prisma-client-js"
 }
- 
+
 model User {
-  id            String          @id @default(cuid())
-  name          String?
-  email         String          @unique
+  id            String    @id @default(cuid())
+  nom           String
+  prenom        String
+  email         String    @unique
+  password      String
+  actif         Boolean   @default(true)
   emailVerified DateTime?
   image         String?
+
+  // Relations d'authentification
   accounts      Account[]
   sessions      Session[]
   // Optional for WebAuthn support
   Authenticator Authenticator[]
- 
+
+  // Relation avec le département
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  // Relation avec la filière
+  filiereId String?
+  filiere   Filiere? @relation(fields: [filiereId], references: [id])
+
+  // Relations directes avec les modules
+  modules Module[] @relation("UserModules")
+
+  // Relation avec les séances en tant qu'enseignant
+  seancesEnseignees Seance[] @relation("SeanceEnseignant")
+
+  // Relations directes avec les rôles
+  roles Role[] @relation("UserRoles")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([departementId])
+  @@index([filiereId])
 }
- 
+
 model Account {
   userId            String
   type              String
@@ -34,33 +59,33 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
- 
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
- 
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
- 
+
   @@id([provider, providerAccountId])
 }
- 
+
 model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
- 
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
- 
+
 model VerificationToken {
   identifier String
   token      String
   expires    DateTime
- 
+
   @@id([identifier, token])
 }
- 
+
 // Optional for WebAuthn support
 model Authenticator {
   credentialID         String  @unique
@@ -71,8 +96,132 @@ model Authenticator {
   credentialDeviceType String
   credentialBackedUp   Boolean
   transports           String?
- 
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
- 
+
   @@id([userId, credentialID])
+}
+
+// Modèle Role pour la gestion des rôles utilisateurs
+model Role {
+  id          String   @id @default(cuid())
+  nom         String   @unique
+  type        TypeRole
+  description String?
+
+  // Relation directe avec les utilisateurs
+  users User[] @relation("UserRoles")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+// Modèle Departement
+model Departement {
+  id          String  @id @default(cuid())
+  nom         String  @unique
+  description String?
+
+  // Relations
+  filieres Filiere[]
+  users    User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Modèle Filiere
+model Filiere {
+  id          String  @id @default(cuid())
+  nom         String  @unique
+  description String?
+
+  // Relation avec le département
+  departementId String
+  departement   Departement @relation(fields: [departementId], references: [id])
+
+  // Relation avec les utilisateurs et modules
+  users   User[]
+  modules Module[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([departementId])
+}
+
+// Modèle Module
+model Module {
+  id          String  @id @default(cuid())
+  nom         String
+  code        String  @unique
+  description String?
+  credits     Int?
+  heures      Int?
+
+  // Relation avec la filière
+  filiereId String
+  filiere   Filiere @relation(fields: [filiereId], references: [id])
+
+  // Relation directe avec les utilisateurs
+  users User[] @relation("UserModules")
+
+  // Relation avec les séances
+  seances Seance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([filiereId])
+  @@index([code])
+}
+
+
+// Modèle Seance
+model Seance {
+  id         String     @id @default(cuid())
+  titre      String
+  contenu    String?
+  dateseance DateTime
+  heureDebut DateTime
+  heureFin   DateTime
+  salle      String?
+  type       TypeSeance @default(COURS)
+  complement String?
+
+  // Relation avec le module
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id])
+
+  // Relation avec l'enseignant (un seul utilisateur par séance)
+  enseignantId String
+  enseignant   User   @relation("SeanceEnseignant", fields: [enseignantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([moduleId])
+  @@index([enseignantId])
+  @@index([dateseance])
+}
+
+// Enum pour les différents types de rôles
+enum TypeRole {
+  ENSEIGNANT
+  ADMINISTRATEUR
+  CHEF_DE_FILIERE
+  CHEF_DE_DEPARTEMENT
+  DIRECTEUR_GENERAL
+}
+
+
+// Enum pour les types de séances
+enum TypeSeance {
+  COURS
+  TD
+  TP
+  EXAMEN
+  CONFERENCE
+  SEMINAIRE
 }
