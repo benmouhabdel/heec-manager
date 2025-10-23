@@ -9,10 +9,10 @@ generator client {
 
 model User {
   id            String    @id @default(cuid())
-  nom           String
-  prenom        String
+  nom           String    @default("")
+  prenom        String    @default("")
   email         String    @unique
-  password      String
+  password      String    @default("")
   actif         Boolean   @default(true)
   emailVerified DateTime?
   image         String?
@@ -39,6 +39,9 @@ model User {
 
   // Relations directes avec les rôles
   roles Role[] @relation("UserRoles")
+
+  // Relation avec les logs d'activité
+  activityLogs ActivityLog[] @relation("UserActivityLogs")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -215,6 +218,53 @@ enum TypeRole {
   DIRECTEUR_GENERAL
 }
 
+
+// Modèle ActivityLog pour le journal d'activités
+model ActivityLog {
+  id          String      @id @default(cuid())
+  action      ActionType
+  entityType  EntityType
+  entityId    String?
+  entityName  String?
+  description String
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+
+  // Relation avec l'utilisateur qui a effectué l'action
+  userId String
+  user   User   @relation("UserActivityLogs", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+// Enum pour les types d'actions
+enum ActionType {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  ASSIGN
+  UNASSIGN
+  ACTIVATE
+  DEACTIVATE
+}
+
+// Enum pour les types d'entités
+enum EntityType {
+  USER
+  ROLE
+  DEPARTEMENT
+  FILIERE
+  MODULE
+  SEANCE
+}
 
 // Enum pour les types de séances
 enum TypeSeance {

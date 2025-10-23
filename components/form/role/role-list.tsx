@@ -1,0 +1,322 @@
+"use client";
+
+import { useState, useEffect, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { RoleCard } from "./role-card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRoles } from "@/lib/actions/role";
+import { TypeRoleSchema } from "@/lib/zodshema";
+import { 
+  Plus, 
+  Search, 
+  ChevronLeft, 
+  ChevronRight, 
+  Loader2,
+  Shield,
+  SortAsc,
+  SortDesc,
+  Filter
+} from "lucide-react";
+
+interface RoleListProps {
+  initialData?: {
+    roles: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  };
+}
+
+export function RoleList({ initialData }: RoleListProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  
+  const [roles, setRoles] = useState(initialData?.roles || []);
+  const [pagination, setPagination] = useState(initialData?.pagination || {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0
+  });
+  
+  const [filters, setFilters] = useState({
+    search: searchParams.get("search") || "",
+    type: searchParams.get("type") || "",
+    sortBy: searchParams.get("sortBy") || "nom",
+    sortOrder: (searchParams.get("sortOrder") as "asc" | "desc") || "asc",
+    page: parseInt(searchParams.get("page") || "1"),
+  });
+
+  const loadRoles = () => {
+    startTransition(async () => {
+      try {
+        const result = await getRoles({
+          page: filters.page,
+          limit: pagination.limit,
+          search: filters.search || undefined,
+          sortBy: filters.sortBy,
+          sortOrder: filters.sortOrder,
+        });
+
+        if (result.success) {
+          setRoles(result.data || []);
+          setPagination(result.pagination || pagination);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des rôles:", error);
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (!initialData) {
+      loadRoles();
+    }
+  }, [filters]);
+
+  const handleSearch = (value: string) => {
+    setFilters(prev => ({ ...prev, search: value, page: 1 }));
+    updateURL({ search: value, page: 1 });
+  };
+
+  const handleTypeFilter = (value: string) => {
+    setFilters(prev => ({ ...prev, type: value, page: 1 }));
+    updateURL({ type: value, page: 1 });
+  };
+
+  const handleSort = (field: string) => {
+    const newOrder = filters.sortBy === field && filters.sortOrder === "asc" ? "desc" : "asc";
+    setFilters(prev => ({ ...prev, sortBy: field, sortOrder: newOrder, page: 1 }));
+    updateURL({ sortBy: field, sortOrder: newOrder, page: 1 });
+  };
+
+  const handlePageChange = (page: number) => {
+    setFilters(prev => ({ ...prev, page }));
+    updateURL({ page });
+  };
+
+  const updateURL = (params: Partial<typeof filters>) => {
+    const newParams = new URLSearchParams(searchParams);
+    
+    Object.entries({ ...filters, ...params }).forEach(([key, value]) => {
+      if (value && value !== "") {
+        newParams.set(key, value.toString());
+      } else {
+        newParams.delete(key);
+      }
+    });
+
+    router.push(`?${newParams.toString()}`);
+  };
+
+  const handleCreateNew = () => {
+    router.push("/roles/nouveau");
+  };
+
+  const handleEdit = (id: string) => {
+    router.push(`/roles/${id}/edit`);
+  };
+
+  const handleDelete = () => {
+    loadRoles(); // Reload after delete
+  };
+
+  const typeRoleOptions = TypeRoleSchema.options;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Rôles</h1>
+          <p className="text-gray-600">
+            Gérez les rôles et permissions de votre établissement
+          </p>
+        </div>
+        <Button onClick={handleCreateNew} className="w-fit">
+          <Plus className="w-4 h-4" />
+          Nouveau rôle
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Recherche et filtres</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Rechercher par nom ou description..."
+                    value={filters.search}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              
+              <div className="w-full sm:w-64">
+                <Select
+                  value={filters.type}
+                  onValueChange={handleTypeFilter}
+                >
+                  <SelectTrigger>
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Tous les types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Tous les types</SelectItem>
+                    {typeRoleOptions.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSort("nom")}
+                className="flex items-center gap-2"
+              >
+                Nom
+                {filters.sortBy === "nom" && (
+                  filters.sortOrder === "asc" ? 
+                    <SortAsc className="w-4 h-4" /> : 
+                    <SortDesc className="w-4 h-4" />
+                )}
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSort("type")}
+                className="flex items-center gap-2"
+              >
+                Type
+                {filters.sortBy === "type" && (
+                  filters.sortOrder === "asc" ? 
+                    <SortAsc className="w-4 h-4" /> : 
+                    <SortDesc className="w-4 h-4" />
+                )}
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSort("createdAt")}
+                className="flex items-center gap-2"
+              >
+                Date
+                {filters.sortBy === "createdAt" && (
+                  filters.sortOrder === "asc" ? 
+                    <SortAsc className="w-4 h-4" /> : 
+                    <SortDesc className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Loading State */}
+      {isPending && (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span className="ml-2">Chargement des rôles...</span>
+        </div>
+      )}
+
+      {/* Results */}
+      {!isPending && (
+        <>
+          {roles.length > 0 ? (
+            <>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {roles.map((role) => (
+                  <RoleCard
+                    key={role.id}
+                    role={role}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">
+                    Affichage de {((pagination.page - 1) * pagination.limit) + 1} à{" "}
+                    {Math.min(pagination.page * pagination.limit, pagination.total)} sur{" "}
+                    {pagination.total} rôles
+                  </p>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(pagination.page - 1)}
+                      disabled={pagination.page <= 1}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Précédent
+                    </Button>
+                    
+                    <span className="px-3 py-1 text-sm bg-gray-100 rounded">
+                      Page {pagination.page} sur {pagination.totalPages}
+                    </span>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(pagination.page + 1)}
+                      disabled={pagination.page >= pagination.totalPages}
+                    >
+                      Suivant
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Shield className="w-12 h-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Aucun rôle trouvé
+                </h3>
+                <p className="text-gray-600 text-center mb-4">
+                  {filters.search 
+                    ? "Aucun rôle ne correspond à votre recherche." 
+                    : "Commencez par créer votre premier rôle."
+                  }
+                </p>
+                <Button onClick={handleCreateNew}>
+                  <Plus className="w-4 h-4" />
+                  Créer un rôle
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

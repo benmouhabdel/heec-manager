@@ -30,9 +30,15 @@ export async function createRole(data: CreateRole) {
 }
 
 // Obtenir tous les rôles avec pagination
-export async function getRoles(params: Pagination = {}) {
+export async function getRoles(params: Partial<Pagination> = {}) {
   try {
-    const { page, limit, search, sortBy, sortOrder } = PaginationSchema.parse(params);
+    const { 
+      page = 1, 
+      limit = 10, 
+      search, 
+      sortBy, 
+      sortOrder = "asc" as const 
+    } = params;
     
     const skip = (page - 1) * limit;
     
@@ -52,16 +58,12 @@ export async function getRoles(params: Pagination = {}) {
         take: limit,
         orderBy,
         include: {
-          userRoles: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  nom: true,
-                  prenom: true,
-                  email: true,
-                },
-              },
+          users: {
+            select: {
+              id: true,
+              nom: true,
+              prenom: true,
+              email: true,
             },
           },
         },
@@ -93,17 +95,13 @@ export async function getRoleById(id: string) {
     const role = await prisma.role.findUnique({
       where: { id: validatedId },
       include: {
-        userRoles: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                nom: true,
-                prenom: true,
-                email: true,
-                actif: true,
-              },
-            },
+        users: {
+          select: {
+            id: true,
+            nom: true,
+            prenom: true,
+            email: true,
+            actif: true,
           },
         },
       },
@@ -146,11 +144,16 @@ export async function deleteRole(id: string) {
     const { id: validatedId } = IdParamSchema.parse({ id });
     
     // Vérifier s'il y a des utilisateurs assignés à ce rôle
-    const userRolesCount = await prisma.userRole.count({
-      where: { roleId: validatedId },
+    const role = await prisma.role.findUnique({
+      where: { id: validatedId },
+      include: { users: true },
     });
 
-    if (userRolesCount > 0) {
+    if (!role) {
+      return { success: false, error: "Rôle non trouvé" };
+    }
+
+    if (role.users.length > 0) {
       return { 
         success: false, 
         error: "Impossible de supprimer ce rôle car il est assigné à des utilisateurs" 
@@ -197,16 +200,12 @@ export async function getRolesByType(type: string) {
     const roles = await prisma.role.findMany({
       where: { type: type as any },
       include: {
-        userRoles: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                nom: true,
-                prenom: true,
-                email: true,
-              },
-            },
+        users: {
+          select: {
+            id: true,
+            nom: true,
+            prenom: true,
+            email: true,
           },
         },
       },

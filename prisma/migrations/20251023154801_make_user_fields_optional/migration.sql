@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "User" ALTER COLUMN "nom" SET DEFAULT '',
+ALTER COLUMN "password" SET DEFAULT '',
+ALTER COLUMN "prenom" SET DEFAULT '';
